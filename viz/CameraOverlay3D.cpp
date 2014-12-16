@@ -5,6 +5,7 @@
 #include <osg/TextureRectangle>
 #include <osg/TexMat>
 #include <frame_helper/FrameHelper.h>
+#include <osgDB/ReadFile>
 
 using namespace vizkit3d;
 
@@ -227,6 +228,12 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
     root_->addChild(frustum_);
     root_->addChild(image_plane_);
     return root_;
+}
+
+void CameraOverlay3D::updateImageFromFile(std::string const &file_path)
+{
+    osg::ref_ptr<osg::Image> osg_image = osgDB::readImageFile(file_path);
+    updateImage(osg_image);
 }
 
 void CameraOverlay3D::updateMainNode ( osg::Node* node )

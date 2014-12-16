@@ -1,0 +1,17 @@
+<package>
+  <description brief="Vizkit 3D plugin for overlaying a camera image in a 3D visualization">
+  
+  </description>
+  <author>Dennis Mronga/dennis.mronga@dfki.de</author>
+  <license></license>
+  <url>http://</url>
+  <logo>http://</logo>
+  <depend package="base/cmake" />
+  <!--
+   To add any dependencies use the depend tag
+  <depend package="dummy-dependency-0" />
+	...
+  <depend package="dummy-dependency-n-1" />
+  <depend package="dummy-dependency-n" />
+  -->
+</package>

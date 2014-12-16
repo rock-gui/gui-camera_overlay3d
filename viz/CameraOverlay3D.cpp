@@ -4,6 +4,7 @@
 #include <osg/MatrixTransform>
 #include <osg/TextureRectangle>
 #include <osg/TexMat>
+#include <frame_helper/FrameHelper.h>
 
 using namespace vizkit3d;
 
@@ -231,12 +232,34 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
 void CameraOverlay3D::updateMainNode ( osg::Node* node )
 {
     osg::Group* group = static_cast<osg::Group*>(node);
+
+    //Frame might be compressed, convert it.
+    frame_helper::FrameHelper helper;
+    base::samples::frame::Frame temp;
+    base::samples::frame::frame_mode_t mode = p->data.frame_mode == base::samples::frame::MODE_GRAYSCALE ? base::samples::frame::MODE_GRAYSCALE : base::samples::frame::MODE_BGR;
+    temp.init(p->data.getWidth(), p->data.getHeight(), p->data.getDataDepth(), mode);
+    helper.convertColor(p->data, temp);
+
+    //Convert image to osg::Image
+    osg::ref_ptr<osg::Image> osg_image = osg::ref_ptr<osg::Image>(new osg::Image);
+    switch(temp.frame_mode){
+    case base::samples::frame::MODE_BGR:
+        osg_image->setImage(temp.getWidth(), temp.getHeight(), 1,
+                         GL_BGR, GL_BGR, GL_UNSIGNED_BYTE, (unsigned char*) temp.getImageConstPtr(), osg::Image::NO_DELETE, 1 );
+        break;
+    case base::samples::frame::MODE_GRAYSCALE:
+        osg_image->setImage(temp.getWidth(), temp.getHeight(), 1,
+                         GL_LUMINANCE, GL_LUMINANCE, GL_UNSIGNED_BYTE, (unsigned char*) temp.getImageConstPtr(), osg::Image::NO_DELETE, 1 );
+        break;
+    default:
+        std::cerr << "Image format '"<<temp.frame_mode<<"' not supported" << std::endl;
+    }
+    updateImage(osg_image);
 }
 
 void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
 {
     p->data = value;
-    std::cout << "got new sample data" << std::endl;
 }
 
 //Macro that makes this plugin loadable in ruby, this is optional.

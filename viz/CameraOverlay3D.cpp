@@ -1,5 +1,6 @@
 #include <iostream>
 #include "CameraOverlay3D.hpp"
+#include <vizkit3d/Vizkit3DWidget.hpp>
 
 using namespace vizkit3d;
 
@@ -19,6 +20,25 @@ CameraOverlay3D::CameraOverlay3D()
 CameraOverlay3D::~CameraOverlay3D()
 {
     delete p;
+}
+
+void CameraOverlay3D::resetCamera()
+{
+    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
+    widget->setCameraEye(0,0,0);
+    widget->setCameraLookAt(0,0,1);
+}
+
+
+void CameraOverlay3D::setCameraFrame(std::string const &frame)
+{
+    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
+    widget->setVisualizationFrame(QString::fromStdString(frame));
+}
+
+void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
+{
+    //TODO
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()

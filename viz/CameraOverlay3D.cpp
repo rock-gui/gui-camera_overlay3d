@@ -2,12 +2,14 @@
 #include "CameraOverlay3D.hpp"
 #include <vizkit3d/Vizkit3DWidget.hpp>
 #include <osg/MatrixTransform>
+#include <osg/TextureRectangle>
+#include <osg/TexMat>
 
 using namespace vizkit3d;
 
 // Given a Camera, create a wireframe representation of its
 // view frustum. Create a default representation if camera==NULL.
-inline osg::Node* makeFrustumFromCamera( osg::Camera* camera )
+osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera )
 {
     // Projection and ModelView matrices
     osg::Matrixd proj;
@@ -42,7 +44,7 @@ inline osg::Node* makeFrustumFromCamera( osg::Camera* camera )
 
     // Our vertex array needs only 9 vertices: The origin, and the
     // eight corners of the near and far planes.
-    osg::Vec3Array* v = new osg::Vec3Array;
+    osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);
     v->resize( 9 );
     (*v)[0].set( 0., 0., 0. );
     (*v)[1].set( nLeft, nBottom, -near );
@@ -54,11 +56,11 @@ inline osg::Node* makeFrustumFromCamera( osg::Camera* camera )
     (*v)[7].set( fRight, fTop, -far );
     (*v)[8].set( fLeft, fTop, -far );
 
-    osg::Geometry* geom = new osg::Geometry;
+    osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     geom->setUseDisplayList( false );
     geom->setVertexArray( v );
 
-    osg::Vec4Array* c = new osg::Vec4Array;
+    osg::ref_ptr<osg::Vec4Array> c = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array);
     c->push_back( osg::Vec4( 1., 1., 1., 1. ) );
     geom->setColorArray( c );
     geom->setColorBinding( osg::Geometry::BIND_OVERALL );
@@ -69,11 +71,11 @@ inline osg::Node* makeFrustumFromCamera( osg::Camera* camera )
         1, 2, 3, 4 };
     GLushort idxLoops1[4] = {
         5, 6, 7, 8 };
-    geom->addPrimitiveSet( new osg::DrawElementsUShort( osg::PrimitiveSet::LINES, 8, idxLines ) );
-    geom->addPrimitiveSet( new osg::DrawElementsUShort( osg::PrimitiveSet::LINE_LOOP, 4, idxLoops0 ) );
-    geom->addPrimitiveSet( new osg::DrawElementsUShort( osg::PrimitiveSet::LINE_LOOP, 4, idxLoops1 ) );
+    geom->addPrimitiveSet( osg::ref_ptr<osg::DrawElementsUShort>(new osg::DrawElementsUShort( osg::PrimitiveSet::LINES, 8, idxLines )) );
+    geom->addPrimitiveSet( osg::ref_ptr<osg::DrawElementsUShort>(new osg::DrawElementsUShort( osg::PrimitiveSet::LINE_LOOP, 4, idxLoops0 )) );
+    geom->addPrimitiveSet( osg::ref_ptr<osg::DrawElementsUShort>(new osg::DrawElementsUShort( osg::PrimitiveSet::LINE_LOOP, 4, idxLoops1 )) );
 
-    osg::Geode* geode = new osg::Geode;
+    osg::ref_ptr<osg::Geode> geode = osg::ref_ptr<osg::Geode>(new osg::Geode);
     geode->addDrawable( geom );
 
     geode->getOrCreateStateSet()->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
@@ -81,11 +83,75 @@ inline osg::Node* makeFrustumFromCamera( osg::Camera* camera )
 
     // Create parent MatrixTransform to transform the view volume by
     // the inverse ModelView matrix.
-    osg::MatrixTransform* mt = new osg::MatrixTransform;
+    osg::ref_ptr<osg::MatrixTransform> mt = osg::ref_ptr<osg::MatrixTransform>(new osg::MatrixTransform);
     mt->setMatrix( osg::Matrixd::inverse( mv ) );
     mt->addChild( geode );
 
     return mt;
+}
+
+void CameraOverlay3D::createImagePlane()
+{
+    ::osg::PositionAttitudeTransform *transform = new ::osg::PositionAttitudeTransform();
+    transform->addChild(image_plane_);
+
+    osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
+    osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);
+    geom->setVertexArray(v);
+
+    // create the box
+    v->push_back( osg::Vec3(0,0,0));
+    v->push_back( osg::Vec3(1,0,0));
+    v->push_back( osg::Vec3(1,1,0));
+    v->push_back( osg::Vec3(0,1,0));
+
+    // Draw a four-vertex quad from the stored data.
+    osg::ref_ptr<osg::DrawArrays> arrays = osg::ref_ptr<osg::DrawArrays>(new ::osg::DrawArrays(::osg::PrimitiveSet::TRIANGLE_STRIP,0,v->size()));
+    geom->addPrimitiveSet(arrays);
+
+    osg::ref_ptr<osg::Vec2Array> texcoords = osg::ref_ptr<osg::Vec2Array>(new osg::Vec2Array(4));
+    (*texcoords)[0].set(0.0f, 0.0f);
+    (*texcoords)[1].set(1.0f, 0.0f);
+    (*texcoords)[2].set(1.0f, 1.0f);
+    (*texcoords)[3].set(0.0f, 1.0f);
+    geom->setTexCoordArray(0, texcoords);
+
+    osg::ref_ptr<osg::Vec3Array> normals = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array(1));
+    //FIXME: or is it -1?
+    (*normals)[0].set(0.0f, 0.0f, 1.0f);
+    geom->setNormalArray(normals);
+    geom->setNormalBinding(osg::Geometry::BIND_OVERALL);
+
+    osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
+    (*colors)[0].set(1.f, 1.f, 1.f, 1.f);
+    geom->setColorArray(colors);
+    geom->setColorBinding(osg::Geometry::BIND_OVERALL);
+
+    image_plane_->addDrawable(geom);
+}
+
+void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
+{
+    osg::ref_ptr<osg::TextureRectangle> background_image = osg::ref_ptr<osg::TextureRectangle>(new osg::TextureRectangle(img));
+
+    osg::ref_ptr<osg::TexMat> texmat = new osg::TexMat;
+    texmat->setScaleByTextureRectangleSize(true);
+
+    // setup state
+    osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
+    state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
+    state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
+    image_plane_->dirtyBound();
+
+    //FIXME: Needed?
+    //state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
+
+    //FIXME: Needed sth like this?
+    //osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
+    //(*colors)[0].set(1.f, 1.f, 1.f, 1.f);
+    //image_plane_->setColorArray(colors);
+    //image_plane_->setColorBinding(osg::Geometry::BIND_OVERALL);
+    //image_plane_->dirtyBound();
 }
 
 struct CameraOverlay3D::Data {
@@ -99,6 +165,8 @@ struct CameraOverlay3D::Data {
 CameraOverlay3D::CameraOverlay3D()
     : p(new Data)
 {
+    image_plane_ = new osg::Geode();
+    frustum_ = new osg::Node();
 }
 
 CameraOverlay3D::~CameraOverlay3D()
@@ -140,25 +208,29 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     //FIXME: Maybe transpose?
     P.set(          2*fx/width,                      0,                              0,  0,
                     -2*s/width,            2*fy/height,                              0,  0,
-                    (width - 2*cx)/width, (height - 2*cy)/height, -(zfar + znear)/(zfar - znear), -1,
+          (width - 2*cx)/width, (height - 2*cy)/height, -(zfar + znear)/(zfar - znear), -1,
                     0,                      0,   -(2*zfar*znear)/(zfar-znear),  0);
 
     camera->setProjectionMatrix(P);
 
+    root_->removeChild(frustum_);
     frustum_ = makeFrustumFromCamera(camera);
+    root_->addChild(frustum_);
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
 {
     // Geode is a common node used for vizkit3d plugins. It allows to display
     // "arbitrary" geometries
-    return new osg::Geode();
+    root_ = osg::ref_ptr<osg::Group>(new osg::Group);
+    root_->addChild(frustum_);
+    root_->addChild(image_plane_);
+    return root_;
 }
 
 void CameraOverlay3D::updateMainNode ( osg::Node* node )
 {
-    osg::Geode* geode = static_cast<osg::Geode*>(node);
-    // Update the main node using the data in p->data
+    osg::Group* group = static_cast<osg::Group*>(node);
 }
 
 void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)

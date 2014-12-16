@@ -36,7 +36,11 @@ protected:
 private:
     struct Data;
     Data* p;
-    osg::Node* frustum_;
+    osg::ref_ptr<osg::Node> frustum_;
+    osg::ref_ptr<osg::Geode> image_plane_;
+    osg::ref_ptr<osg::Group> root_;
+    void createImagePlane();
+    void updateImage(osg::ref_ptr<osg::Image> img);
 };
 }
 #endif

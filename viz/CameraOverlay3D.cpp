@@ -38,7 +38,28 @@ void CameraOverlay3D::setCameraFrame(std::string const &frame)
 
 void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
 {
-    //TODO
+    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
+    osg::Camera* camera = widget->getView(0)->getCamera();
+    camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+
+    float fx = calib.fx;
+    float fy = calib.fy;
+    float s = 0;
+    float width = calib.width;
+    float height = calib.height;
+    float cx = calib.cx;
+    float cy = calib.cy;
+    float znear = 1.0f;
+    float zfar = 10000.0f;
+
+    osg::Matrixd P;
+    //FIXME: Maybe transpose?
+    P.set(          2*fx/width,                      0,                              0,  0,
+                    -2*s/width,            2*fy/height,                              0,  0,
+                    (width - 2*cx)/width, (height - 2*cy)/height, -(zfar + znear)/(zfar - znear), -1,
+                    0,                      0,   -(2*zfar*znear)/(zfar-znear),  0);
+
+    camera->setProjectionMatrix(P);
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()

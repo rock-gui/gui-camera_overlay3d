@@ -36,6 +36,7 @@ protected:
 private:
     struct Data;
     Data* p;
+    osg::Node* frustum_;
 };
 }
 #endif

@@ -11,7 +11,7 @@ using namespace vizkit3d;
 
 // Given a Camera, create a wireframe representation of its
 // view frustum. Create a default representation if camera==NULL.
-osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera )
+osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* camera )
 {
     // Projection and ModelView matrices
     osg::Matrixd proj;
@@ -44,19 +44,21 @@ osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera )
     const double fTop = far * (1.0+proj(2,1)) / proj(1,1);
     const double fBottom = far * (proj(2,1)-1.0) / proj(1,1);
 
+    createImagePlane(fLeft, fRight, fTop, fBottom, far-2);
+
     // Our vertex array needs only 9 vertices: The origin, and the
     // eight corners of the near and far planes.
     osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);
     v->resize( 9 );
     (*v)[0].set( 0., 0., 0. );
-    (*v)[1].set( nLeft, nBottom, -near );
-    (*v)[2].set( nRight, nBottom, -near );
-    (*v)[3].set( nRight, nTop, -near );
-    (*v)[4].set( nLeft, nTop, -near );
-    (*v)[5].set( fLeft, fBottom, -far );
-    (*v)[6].set( fRight, fBottom, -far );
-    (*v)[7].set( fRight, fTop, -far );
-    (*v)[8].set( fLeft, fTop, -far );
+    (*v)[1].set( nLeft, nBottom, near );
+    (*v)[2].set( nRight, nBottom, near );
+    (*v)[3].set( nRight, nTop, near );
+    (*v)[4].set( nLeft, nTop, near );
+    (*v)[5].set( fLeft, fBottom, far );
+    (*v)[6].set( fRight, fBottom, far );
+    (*v)[7].set( fRight, fTop, far );
+    (*v)[8].set( fLeft, fTop, far );
 
     std::cout << nLeft<<", "<<nRight<<","<<nBottom<<","<<nTop<<std::endl;
     std::cout << fLeft<<", "<<fRight<<","<<fBottom<<","<<fTop<<std::endl;
@@ -96,7 +98,7 @@ osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera )
     return mt;
 }
 
-void CameraOverlay3D::createImagePlane()
+void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float z)
 {
     ::osg::PositionAttitudeTransform *transform = new ::osg::PositionAttitudeTransform();
     transform->addChild(image_plane_);
@@ -106,10 +108,10 @@ void CameraOverlay3D::createImagePlane()
     geom->setVertexArray(v);
 
     // create the box
-    v->push_back( osg::Vec3(0,0,0));
-    v->push_back( osg::Vec3(1,0,0));
-    v->push_back( osg::Vec3(1,1,0));
-    v->push_back( osg::Vec3(0,1,0));
+    v->push_back( osg::Vec3(l,t,z));
+    v->push_back( osg::Vec3(r,t,z));
+    v->push_back( osg::Vec3(r,b,z));
+    v->push_back( osg::Vec3(l,b,z));
 
     // Draw a four-vertex quad from the stored data.
     osg::ref_ptr<osg::DrawArrays> arrays = osg::ref_ptr<osg::DrawArrays>(new ::osg::DrawArrays(::osg::PrimitiveSet::TRIANGLE_STRIP,0,v->size()));
@@ -124,7 +126,7 @@ void CameraOverlay3D::createImagePlane()
 
     osg::ref_ptr<osg::Vec3Array> normals = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array(1));
     //FIXME: or is it -1?
-    (*normals)[0].set(0.0f, 0.0f, -1.0f);
+    (*normals)[0].set(0.0f, 0.0f, 1.0f);
     geom->setNormalArray(normals);
     geom->setNormalBinding(osg::Geometry::BIND_OVERALL);
 
@@ -150,7 +152,7 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     image_plane_->dirtyBound();
 
     //FIXME: Needed?
-    //state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
+    state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
 
     //FIXME: Needed sth like this?
     //osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
@@ -201,10 +203,29 @@ void CameraOverlay3D::setCameraFrame(std::string const &frame)
     widget->setVisualizationFrame(QString::fromStdString(frame));
 }
 
+void CameraOverlay3D::setCameraIntrinsicsVect(std::vector<double> const &calib)
+{
+    frame_helper::CameraCalibration c;
+    c.fx = calib[0];
+    c.fy = calib[1];
+    c.cx = calib[2];
+    c.cy = calib[3];
+    c.d0 = calib[4];
+    c.d1 = calib[5];
+    c.d2 = calib[6];
+    c.d3 = calib[7];
+    c.width = calib[8];
+    c.height = calib[9];
+
+    setCameraIntrinsics(c);
+}
+
 void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
 {
-    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
+    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget*>(this->parent());
+    assert(widget);
     osg::Camera* camera = widget->getView(0)->getCamera();
+    assert(camera);
     camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
     float fx = calib.fx;
@@ -226,10 +247,10 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
 
     camera->setProjectionMatrix(P);
 
-    root_->removeChild(frustum_);
+//    root_->removeChild(frustum_);
     frustum_ = makeFrustumFromCamera(camera);
-    root_->addChild(frustum_);
-    this->setDirty();
+//    root_->addChild(frustum_);
+//    this->setDirty();
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()

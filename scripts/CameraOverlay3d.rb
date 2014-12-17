@@ -2,10 +2,26 @@ require 'vizkit'
 require 'transformer/runtime'
 require 'pry'
 
+Orocos.load_typekit('robot_frames')
+Orocos.load_typekit('aruco')
+
 urdf_file = "#{ENV["AILA_BUNDLE_DIR"]}/data/aila.urdf"
 limits = "#{ENV["AILA_BUNDLE_DIR"]}/config/joint_limits/joint_limits_bodywithhead.yml"
+camera_calib = Types::FrameHelper::CameraCalibration.new
+camera_calib.fx = 523.55539
+camera_calib.fy = 524.20812
+camera_calib.cx = 376.17248
+camera_calib.cy = 284.91054
+camera_calib.d0 = -0.36903
+camera_calib.d1 = 0.20010
+camera_calib.d2 = 0.00035
+camera_calib.d3 = -0.00019
+camera_calib.width = 782.0
+camera_calib.height = 582.0
 
-Orocos.load_typekit('robot_frames')
+
+calib = Types::FrameHelper::CameraCalibration.new
+
 
 #############################################################
 
@@ -35,15 +51,19 @@ end
 #############################################################
 
 overlay = Vizkit.default_loader.CameraOverlay3D
+overlay.frame = "LeftCamera"
+overlay.setCameraIntrinsics(camera_calib)
+overlay.resetCamera()
+
 #roboviz = Vizkit.default_loader.RobotVisualization
 #roboviz.modelFile = urdf_file
 #roboviz.jointsSize = 0.02
 #roboviz.frame = "Rover_base"
+
 ctrl_gui=Vizkit.default_loader.ControlUi
 ctrl_gui.initFromYaml(limits)
 
-overlay.frame = "LeftCamera"
-overlay.resetCamera()
+##############################################################
 
 Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do
   begin

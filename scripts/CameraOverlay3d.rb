@@ -101,6 +101,7 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
     button.show()
     button.setText('Reset Camera')
     button.connect(button,SIGNAL('pressed()')) do
+        overlay.setCameraIntrinsics(camera_calib)
         overlay.resetCamera()
     end
 

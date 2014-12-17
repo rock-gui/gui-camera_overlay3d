@@ -44,7 +44,7 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* cam
     const double fTop = far * (1.0+proj(2,1)) / proj(1,1);
     const double fBottom = far * (proj(2,1)-1.0) / proj(1,1);
 
-    createImagePlane(fLeft, fRight, fTop, fBottom, far-2);
+    createImagePlane(nLeft, nRight, nTop, nBottom, near+0.00001);
 
     // Our vertex array needs only 9 vertices: The origin, and the
     // eight corners of the near and far planes.
@@ -59,10 +59,6 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* cam
     (*v)[6].set( fRight, fBottom, far );
     (*v)[7].set( fRight, fTop, far );
     (*v)[8].set( fLeft, fTop, far );
-
-    std::cout << nLeft<<", "<<nRight<<","<<nBottom<<","<<nTop<<std::endl;
-    std::cout << fLeft<<", "<<fRight<<","<<fBottom<<","<<fTop<<std::endl;
-    std::cout << "#"<<std::endl;
 
     osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     geom->setUseDisplayList( false );
@@ -147,10 +143,10 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
-    image_plane_->dirtyBound();
+    //image_plane_->dirtyBound();
 
     //FIXME: Needed?
-    state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
+    //state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
 
     //FIXME: Needed sth like this?
     //osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
@@ -229,23 +225,28 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     float fx = calib.fx;
     float fy = calib.fy;
     float s = 0;
-    float width = calib.width;
-    float height = calib.height;
+    float height = widget->getView(0)->getCamera()->getViewport()->height();
+    float width = calib.width * (height/calib.height);
     float cx = calib.cx;
     float cy = calib.cy;
-    float znear = 0.001f;
+    float znear = 1.0f;
     float zfar = 10000.0f;
+
+    /*widget->setMinimumWidth(width);
+    widget->setMinimumHeight(height);
+    widget->setMaximumWidth(width);
+    widget->setMaximumHeight(height);
+    camera->setViewport( new osg::Viewport(0, 0, width, height) );*/
 
     osg::Matrixd P;
     //FIXME: Maybe transpose?
     P.set(          2*fx/width,                      0,                              0,  0,
-                    -2*s/width,            2*fy/height,                              0,  0,
-          (width - 2*cx)/width, (height - 2*cy)/height, -(zfar + znear)/(zfar - znear), -1,
-                    0,                      0,   -(2*zfar*znear)/(zfar-znear),  0);
+                    -2*s/width,            -2*fy/height,                              0,  0,
+          (width - 2*cx)/width, (height - 2*cy)/height, (-zfar - znear)/(zfar - znear), -1,
+                    0,                      0,   (-2*zfar*znear)/(zfar-znear),  0);
 
     camera->setProjectionMatrix(P);
 
-//    root_->removeChild(frustum_);
     frustum_ = makeFrustumFromCamera(camera);
 //    root_->addChild(frustum_);
 //    this->setDirty();

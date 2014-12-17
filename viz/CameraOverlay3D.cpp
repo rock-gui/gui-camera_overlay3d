@@ -103,18 +103,17 @@ void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float
     ::osg::PositionAttitudeTransform *transform = new ::osg::PositionAttitudeTransform();
     transform->addChild(image_plane_);
 
+    // create the box
     osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);
-    geom->setVertexArray(v);
-
-    // create the box
     v->push_back( osg::Vec3(l,t,z));
     v->push_back( osg::Vec3(r,t,z));
     v->push_back( osg::Vec3(r,b,z));
     v->push_back( osg::Vec3(l,b,z));
+    geom->setVertexArray(v);
 
     // Draw a four-vertex quad from the stored data.
-    osg::ref_ptr<osg::DrawArrays> arrays = osg::ref_ptr<osg::DrawArrays>(new ::osg::DrawArrays(::osg::PrimitiveSet::TRIANGLE_STRIP,0,v->size()));
+    osg::ref_ptr<osg::DrawArrays> arrays = osg::ref_ptr<osg::DrawArrays>(new ::osg::DrawArrays(::osg::PrimitiveSet::QUADS,0,v->size()));
     geom->addPrimitiveSet(arrays);
 
     osg::ref_ptr<osg::Vec2Array> texcoords = osg::ref_ptr<osg::Vec2Array>(new osg::Vec2Array(4));

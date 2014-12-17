@@ -58,6 +58,10 @@ osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera )
     (*v)[7].set( fRight, fTop, -far );
     (*v)[8].set( fLeft, fTop, -far );
 
+    std::cout << nLeft<<", "<<nRight<<","<<nBottom<<","<<nTop<<std::endl;
+    std::cout << fLeft<<", "<<fRight<<","<<fBottom<<","<<fTop<<std::endl;
+    std::cout << "#"<<std::endl;
+
     osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     geom->setUseDisplayList( false );
     geom->setVertexArray( v );
@@ -120,7 +124,7 @@ void CameraOverlay3D::createImagePlane()
 
     osg::ref_ptr<osg::Vec3Array> normals = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array(1));
     //FIXME: or is it -1?
-    (*normals)[0].set(0.0f, 0.0f, 1.0f);
+    (*normals)[0].set(0.0f, 0.0f, -1.0f);
     geom->setNormalArray(normals);
     geom->setNormalBinding(osg::Geometry::BIND_OVERALL);
 
@@ -154,6 +158,7 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     //image_plane_->setColorArray(colors);
     //image_plane_->setColorBinding(osg::Geometry::BIND_OVERALL);
     //image_plane_->dirtyBound();
+    this->setDirty();
 }
 
 struct CameraOverlay3D::Data {
@@ -181,6 +186,12 @@ void CameraOverlay3D::resetCamera()
     Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
     widget->setCameraEye(0,0,0);
     widget->setCameraLookAt(0,0,1);
+    this->setDirty();
+
+    osg::Camera* camera = widget->getView(0)->getCamera();
+    osg::CullStack::CullingMode cullingMode = camera->getCullingMode();
+    cullingMode &= ~(osg::CullStack::SMALL_FEATURE_CULLING);
+    camera->setCullingMode( cullingMode );
 }
 
 
@@ -203,7 +214,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     float height = calib.height;
     float cx = calib.cx;
     float cy = calib.cy;
-    float znear = 1.0f;
+    float znear = 0.001f;
     float zfar = 10000.0f;
 
     osg::Matrixd P;
@@ -218,6 +229,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     root_->removeChild(frustum_);
     frustum_ = makeFrustumFromCamera(camera);
     root_->addChild(frustum_);
+    this->setDirty();
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
@@ -239,7 +251,11 @@ void CameraOverlay3D::updateImageFromFile(std::string const &file_path)
 void CameraOverlay3D::updateMainNode ( osg::Node* node )
 {
     osg::Group* group = static_cast<osg::Group*>(node);
+}
 
+void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
+{
+    p->data = value;
     //Frame might be compressed, convert it.
     frame_helper::FrameHelper helper;
     base::samples::frame::Frame temp;
@@ -262,11 +278,6 @@ void CameraOverlay3D::updateMainNode ( osg::Node* node )
         std::cerr << "Image format '"<<temp.frame_mode<<"' not supported" << std::endl;
     }
     updateImage(osg_image);
-}
-
-void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
-{
-    p->data = value;
 }
 
 //Macro that makes this plugin loadable in ruby, this is optional.

@@ -14,7 +14,7 @@ image_files = Dir.entries('images').map do |f| f if f.split('.')[-1]=='png' end.
 #Setup chains we want to publish
 chains=[]
 c=Types::RobotFrames::Chain.new
-c.root_link = "base_link"
+c.root_link = "Rover_base"
 c.name = "cam"
 c.tip_link = "LeftCamera"
 chains.push c.dup
@@ -35,9 +35,10 @@ end
 #############################################################
 
 overlay = Vizkit.default_loader.CameraOverlay3D
-roboviz = Vizkit.default_loader.RobotVisualization
-roboviz.modelFile = urdf_file
-roboviz.jointsSize = 0.02
+#roboviz = Vizkit.default_loader.RobotVisualization
+#roboviz.modelFile = urdf_file
+#roboviz.jointsSize = 0.02
+#roboviz.frame = "Rover_base"
 ctrl_gui=Vizkit.default_loader.ControlUi
 ctrl_gui.initFromYaml(limits)
 
@@ -48,12 +49,13 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
   begin
     #Change images every 5 seconds
     t=Qt::Timer.new
-    t.start(5)
+    t.start(500)
     idx=0
     t.connect(t, SIGNAL('timeout()')) do
        current_image = image_files[idx]
        overlay.updateImageFromFile(current_image)
        idx = (idx+1) % image_files.size
+       puts "Set image #{current_image}"
     end
 
     #Make robot controllable via gui. Update FK and visualization
@@ -68,13 +70,24 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
 
     ctrl_gui.connect(SIGNAL('sendSignal()')) do
         port_writer.write(ctrl_gui.getJoints())
-        roboviz.updateData(ctrl_gui.getJoints())
+        #roboviz.updateData(ctrl_gui.getJoints())
+    end
+
+    # A button to trigger the camera reset
+    button = Qt::PushButton.new()
+    button.setSizePolicy(Qt::SizePolicy::Expanding, Qt::SizePolicy::Expanding)
+    button.setMinimumWidth(50)
+    button.setMinimumHeight(50)
+    button.show()
+    button.setText('Reset Camera')
+    button.connect(button,SIGNAL('pressed()')) do
+        overlay.resetCamera()
     end
 
     sleep(5)
 
     #Orocos.transformer.update_configuration_state
-    #bc=Orocos.name_service.get(Transformer.broadcaster_name)
+    bc=Orocos.name_service.get(Transformer.broadcaster_name)
     #bc.start
     #sleep(1)
     #bc.setConfiguration Orocos.transformer.configuration_state

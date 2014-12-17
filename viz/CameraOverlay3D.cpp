@@ -124,8 +124,7 @@ void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float
     geom->setTexCoordArray(0, texcoords);
 
     osg::ref_ptr<osg::Vec3Array> normals = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array(1));
-    //FIXME: or is it -1?
-    (*normals)[0].set(0.0f, 0.0f, 1.0f);
+    (*normals)[0].set(0.0f, 0.0f, -1.0f);
     geom->setNormalArray(normals);
     geom->setNormalBinding(osg::Geometry::BIND_OVERALL);
 

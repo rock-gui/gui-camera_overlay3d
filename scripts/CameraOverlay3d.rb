@@ -25,7 +25,7 @@ calib = Types::FrameHelper::CameraCalibration.new
 
 #############################################################
 
-image_files = Dir.entries('images').map do |f| f if f.split('.')[-1]=='png' end.compact!.reverse!
+image_files = Dir.entries('images').map do |f| "images/#{f}" if f.split('.')[-1]=='png' end.compact!.reverse!
 
 #Setup chains we want to publish
 chains=[]

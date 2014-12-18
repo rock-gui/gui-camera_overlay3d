@@ -126,7 +126,9 @@ void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float
     geom->setColorArray(colors);
     geom->setColorBinding(osg::Geometry::BIND_OVERALL);
 
+    image_plane_->removeDrawables(0,1);
     image_plane_->addDrawable(geom);
+    image_plane_->dirtyBound();
 }
 
 void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)

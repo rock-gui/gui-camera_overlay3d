@@ -7,6 +7,8 @@
 #include <osg/io_utils>
 #include <frame_helper/FrameHelper.h>
 #include <osgDB/ReadFile>
+#include <QTimer>
+#include <osgGA/TrackballManipulator>
 
 using namespace vizkit3d;
 
@@ -36,7 +38,7 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* cam
 
     // Get near and far from the Projection matrix.
     const double near = proj(3,2) / (proj(2,2)-1.0);
-    const double far = proj(3,2) / (1.0+proj(2,2));
+    const double far = 5.0;//proj(3,2) / (1.0+proj(2,2));
 
     // Get the sides of the near plane.
     float nLeft, nRight, nTop, nBottom;
@@ -171,6 +173,7 @@ struct CameraOverlay3D::Data {
 CameraOverlay3D::CameraOverlay3D()
     : p(new Data)
 {
+    root_ = osg::ref_ptr<osg::Group>(new osg::Group);
     image_plane_ = new osg::Geode();
     frustum_ = new osg::Node();
 }
@@ -182,23 +185,14 @@ CameraOverlay3D::~CameraOverlay3D()
 
 void CameraOverlay3D::resetCamera()
 {
-    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
-    widget->setCameraEye(0,0,0);
-    widget->setCameraUp(0,-1,0);
-    widget->setCameraLookAt(0,0,1);
-    this->setDirty();
 
-    osg::Camera* camera = widget->getView(0)->getCamera();
-    osg::CullStack::CullingMode cullingMode = camera->getCullingMode();
-    cullingMode &= ~(osg::CullStack::SMALL_FEATURE_CULLING);
-    camera->setCullingMode( cullingMode );
 }
 
 
 void CameraOverlay3D::setCameraFrame(std::string const &frame)
 {
-    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
-    widget->setVisualizationFrame(QString::fromStdString(frame));
+    Vizkit3DWidget * parent = dynamic_cast<Vizkit3DWidget *>(this->parent());
+    parent->setVisualizationFrame(QString::fromStdString(frame));
 }
 
 void CameraOverlay3D::setCameraIntrinsicsVect(std::vector<double> const &calib)
@@ -220,13 +214,12 @@ void CameraOverlay3D::setCameraIntrinsicsVect(std::vector<double> const &calib)
 
 void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
 {
-    Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget*>(this->parent());
-    assert(widget);
-    osg::Camera* camera = widget->getView(0)->getCamera();
-    assert(camera);
-    camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+    Vizkit3DWidget * parent = dynamic_cast<Vizkit3DWidget*>(this->parent());
+    assert(parent);
+    //osg::Camera* camera = widget->getView(0)->getCamera();
+    //assert(camera);
 
-    float scale = 1;//widget->getView(0)->getCamera()->getViewport()->height() / calib.height;
+    float scale = 1;//parent->getView(0)->getCamera()->getViewport()->height() / calib.height;
 
     float fx = calib.fx*scale;
     float fy = calib.fy*scale;
@@ -235,8 +228,70 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     float width = calib.width*scale;
     float cx = calib.cx*scale;
     float cy = calib.cy*scale;
-    float znear = 0.5f;
-    float zfar = 1000.0f;
+    float znear = 0.1f;
+    float zfar = 100.0f;
+
+    /* WINDOW */
+    ::osg::DisplaySettings* ds = ::osg::DisplaySettings::instance().get();
+    ::osg::ref_ptr< ::osg::GraphicsContext::Traits> traits = new ::osg::GraphicsContext::Traits;
+    traits->windowName = "CameraOverlay";
+    traits->windowDecoration = true;
+    traits->x = 0;
+    traits->y = 0;
+    traits->width = width;
+    traits->height = height;
+    traits->doubleBuffer = true;
+    traits->alpha = ds->getMinimumNumAlphaBits();
+    traits->stencil = ds->getMinimumNumStencilBits();
+    traits->sampleBuffers = ds->getMultiSamples();
+    traits->samples = ds->getNumMultiSamples();
+    osgQt::GraphicsWindowQt* gw = new osgQt::GraphicsWindowQt(traits.get());
+
+    view_ = new osgViewer::View;
+    parent->addView(view_);
+
+    std::vector<osgViewer::Scene*> scenes;
+    parent->getScenes(scenes, true);
+    std::ofstream of("out.txt");
+    of << scenes.size()<<std::endl;
+    of.close();
+    view_->setSceneData(scenes[0]->getSceneData());
+
+    camera = view_->getCamera();
+    camera->setGraphicsContext( gw );
+    camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+
+    camera->setClearColor(::osg::Vec4(0.4, 0.3, 0.4, 1.0) );
+    camera->setViewport( new ::osg::Viewport(0, 0, traits->width, traits->height) );
+
+    assert(root_);
+    //Manipulator
+    //Follow cam
+    osg::PositionAttitudeTransform* camFrameConversion = new osg::PositionAttitudeTransform();
+    camFrameConversion->setAttitude(osg::Quat(M_PI, osg::Vec3(0,1,0), M_PI, osg::Vec3(0,0,1), 0, osg::Vec3(0,1,0)));
+    root_->addChild(camFrameConversion);
+    TransformAccumulator* camWorldCoords = new TransformAccumulator();
+    camWorldCoords->attachToGroup(camFrameConversion);
+
+    followCam =
+       new FollowNodeMatrixManipulator(camWorldCoords);
+
+    //Trackball
+    trackball_manipulator = new osgGA::TrackballManipulator();
+
+    view_->setCameraManipulator(followCam);
+
+
+
+    QWidget* widget = gw->getGLWidget();
+    widget->show();
+    QTimer* timer = new QTimer();
+    connect( timer, SIGNAL(timeout()), widget, SLOT(update()) );
+    timer->start(10);
+
+    widget->setSizePolicy( QSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding ) );
+    widget->setObjectName(QString("View Widget"));
+
 
     osg::Matrixd P(  2.0*fx/width,                 0,                         0,  0,
                       2.0*s/width,     2.0*fy/height,                         0,  0,
@@ -255,7 +310,6 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
 {
     // Geode is a common node used for vizkit3d plugins. It allows to display
     // "arbitrary" geometries
-    root_ = osg::ref_ptr<osg::Group>(new osg::Group);
     root_->addChild(frustum_);
     root_->addChild(image_plane_);
     return root_;

@@ -6,7 +6,10 @@
 #include <osg/Geode>
 #include <base/samples/Frame.hpp>
 #include <frame_helper/Calibration.h>
+#include <osgQt/GraphicsWindowQt>
 #include <base/samples/RigidBodyState.hpp>
+#include "FollowNodeMatrixManipulator.h"
+#include <osgGA/TrackballManipulator>
 
 namespace vizkit3d
 {
@@ -41,6 +44,10 @@ private:
     osg::ref_ptr<osg::Node> frustum_;
     osg::ref_ptr<osg::Geode> image_plane_;
     osg::ref_ptr<osg::Group> root_;
+    ::osg::Camera* camera;
+    osgViewer::View* view_;
+    FollowNodeMatrixManipulator* followCam;
+    osgGA::TrackballManipulator* trackball_manipulator;
     osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera );
     void createImagePlane(osg::Camera* camera, float distance);
     void updateImage(osg::ref_ptr<osg::Image> img);

@@ -149,7 +149,7 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
 
     //FIXME: Needed?
-    //state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
+    state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
 
     //FIXME: Needed sth like this?
     //osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));

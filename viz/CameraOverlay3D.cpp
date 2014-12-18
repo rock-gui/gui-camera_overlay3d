@@ -4,6 +4,7 @@
 #include <osg/MatrixTransform>
 #include <osg/TextureRectangle>
 #include <osg/TexMat>
+#include <osg/io_utils>
 #include <frame_helper/FrameHelper.h>
 #include <osgDB/ReadFile>
 
@@ -142,7 +143,6 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
-    //image_plane_->dirtyBound();
 
     //FIXME: Needed?
     //state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);

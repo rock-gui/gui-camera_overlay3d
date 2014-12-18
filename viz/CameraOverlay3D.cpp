@@ -149,16 +149,8 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
     state->setMode(GL_DEPTH_TEST, ::osg::StateAttribute::OFF);
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
-
-    //FIXME: Needed?
     state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
 
-    //FIXME: Needed sth like this?
-    //osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
-    //(*colors)[0].set(1.f, 1.f, 1.f, 1.f);
-    //image_plane_->setColorArray(colors);
-    //image_plane_->setColorBinding(osg::Geometry::BIND_OVERALL);
-    //image_plane_->dirtyBound();
     this->setDirty();
 }
 
@@ -183,11 +175,6 @@ CameraOverlay3D::~CameraOverlay3D()
     delete p;
 }
 
-void CameraOverlay3D::resetCamera()
-{
-
-}
-
 
 void CameraOverlay3D::setCameraFrame(std::string const &frame)
 {
@@ -195,31 +182,13 @@ void CameraOverlay3D::setCameraFrame(std::string const &frame)
     parent->setVisualizationFrame(QString::fromStdString(frame));
 }
 
-void CameraOverlay3D::setCameraIntrinsicsVect(std::vector<double> const &calib)
-{
-    frame_helper::CameraCalibration c;
-    c.fx = calib[0];
-    c.fy = calib[1];
-    c.cx = calib[2];
-    c.cy = calib[3];
-    c.d0 = calib[4];
-    c.d1 = calib[5];
-    c.d2 = calib[6];
-    c.d3 = calib[7];
-    c.width = calib[8];
-    c.height = calib[9];
-
-    setCameraIntrinsics(c);
-}
 
 void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
 {
     Vizkit3DWidget * parent = dynamic_cast<Vizkit3DWidget*>(this->parent());
     assert(parent);
-    //osg::Camera* camera = widget->getView(0)->getCamera();
-    //assert(camera);
 
-    float scale = 1;//parent->getView(0)->getCamera()->getViewport()->height() / calib.height;
+    float scale = 1;
 
     float fx = calib.fx*scale;
     float fy = calib.fy*scale;
@@ -231,7 +200,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     float znear = 0.1f;
     float zfar = 100.0f;
 
-    /* WINDOW */
+    /* Create new window */
     ::osg::DisplaySettings* ds = ::osg::DisplaySettings::instance().get();
     ::osg::ref_ptr< ::osg::GraphicsContext::Traits> traits = new ::osg::GraphicsContext::Traits;
     traits->windowName = "CameraOverlay";
@@ -247,16 +216,16 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     traits->samples = ds->getNumMultiSamples();
     osgQt::GraphicsWindowQt* gw = new osgQt::GraphicsWindowQt(traits.get());
 
+    //Create new View
     view_ = new osgViewer::View;
     parent->addView(view_);
 
+    //Hack to get access to scene. Vizkit3dWidget does not give access to parent->root
     std::vector<osgViewer::Scene*> scenes;
     parent->getScenes(scenes, true);
-    std::ofstream of("out.txt");
-    of << scenes.size()<<std::endl;
-    of.close();
     view_->setSceneData(scenes[0]->getSceneData());
 
+    //Setup camera for new view. This is our calibrated camera.
     camera = view_->getCamera();
     camera->setGraphicsContext( gw );
     camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
@@ -265,9 +234,10 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     camera->setViewport( new ::osg::Viewport(0, 0, traits->width, traits->height) );
 
     assert(root_);
-    //Manipulator
-    //Follow cam
+    //Make the camera follow the root of this plug-in
     osg::PositionAttitudeTransform* camFrameConversion = new osg::PositionAttitudeTransform();
+    //This transform aligns the camera to look into the correct direction.
+    //We expect the camera to be z: front, x: right, y: down
     camFrameConversion->setAttitude(osg::Quat(M_PI, osg::Vec3(0,1,0), M_PI, osg::Vec3(0,0,1), 0, osg::Vec3(0,1,0)));
     root_->addChild(camFrameConversion);
     TransformAccumulator* camWorldCoords = new TransformAccumulator();
@@ -275,9 +245,6 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
 
     followCam =
        new FollowNodeMatrixManipulator(camWorldCoords);
-
-    //Trackball
-    trackball_manipulator = new osgGA::TrackballManipulator();
 
     view_->setCameraManipulator(followCam);
 

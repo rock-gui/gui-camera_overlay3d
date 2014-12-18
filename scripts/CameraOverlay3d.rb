@@ -1,8 +1,6 @@
-require 'orocos'
+require 'vizkit'
 require 'transformer/runtime'
 require 'pry'
-
-Orocos.initialize
 
 Orocos.load_typekit('robot_frames')
 Orocos.load_typekit('aruco')
@@ -51,42 +49,23 @@ chains.each do |c|
 end
 
 #############################################################
-Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk"
-sleep(2)
-
-#Make robot controllable via gui. Update FK and visualization
-fk = Orocos.name_service.get 'fk'
-fk.chains = chains
-fk.urdf_file = urdf_file
-fk.configure
-fk.start
-
-Orocos.transformer.update_configuration_state
-bc=Orocos.name_service.get(Transformer.broadcaster_name)
-bc.start
-sleep(1)
-bc.setConfiguration Orocos.transformer.configuration_state
-sleep(2)
-
-#############################################################
-
-require 'vizkit'
 
 overlay = Vizkit.default_loader.CameraOverlay3D
 overlay.frame = "LeftCamera"
 overlay.setCameraIntrinsics(camera_calib)
-overlay.resetCamera()
+#overlay.resetCamera()
 
-roboviz = Vizkit.default_loader.RobotVisualization
-roboviz.modelFile = urdf_file
-roboviz.jointsSize = 0.02
-roboviz.frame = "Rover_base"
+#roboviz = Vizkit.default_loader.RobotVisualization
+#roboviz.modelFile = urdf_file
+#roboviz.jointsSize = 0.02
+#roboviz.frame = "Rover_base"
 
 ctrl_gui=Vizkit.default_loader.ControlUi
 ctrl_gui.initFromYaml(limits)
 
 ##############################################################
 
+Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do
   begin
     #Change images every 5 seconds
     t=Qt::Timer.new
@@ -99,33 +78,31 @@ ctrl_gui.initFromYaml(limits)
        puts "Set image #{current_image}"
     end
 
-    
+    #Make robot controllable via gui. Update FK and visualization
+    fk = Orocos.name_service.get 'fk'
+    fk.chains = chains
+    fk.urdf_file = urdf_file
+    fk.configure
+    fk.start
     port_writer = fk.input.writer
 
     ctrl_gui.enableSendCBs(true)
 
     ctrl_gui.connect(SIGNAL('sendSignal()')) do
         port_writer.write(ctrl_gui.getJoints())
-        roboviz.updateData(ctrl_gui.getJoints())
-    end
-
-    # A button to trigger the camera reset
-    button = Qt::PushButton.new()
-    button.setSizePolicy(Qt::SizePolicy::Expanding, Qt::SizePolicy::Expanding)
-    button.setMinimumWidth(50)
-    button.setMinimumHeight(50)
-    button.show()
-    button.setText('Reset Camera')
-    button.connect(button,SIGNAL('pressed()')) do
-        overlay.resetCamera()
-        overlay.setCameraIntrinsics(camera_calib)
+        #roboviz.updateData(ctrl_gui.getJoints())
     end
 
     sleep(5)
 
+    #Orocos.transformer.update_configuration_state
+    bc=Orocos.name_service.get(Transformer.broadcaster_name)
+    #bc.start
+    #sleep(1)
+    #bc.setConfiguration Orocos.transformer.configuration_state
     Vizkit.exec
   rescue Exception => ex
     puts ex
   end
-
+end
 

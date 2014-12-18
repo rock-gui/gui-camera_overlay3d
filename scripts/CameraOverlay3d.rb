@@ -53,12 +53,11 @@ end
 overlay = Vizkit.default_loader.CameraOverlay3D
 overlay.frame = "LeftCamera"
 overlay.setCameraIntrinsics(camera_calib)
-#overlay.resetCamera()
 
-#roboviz = Vizkit.default_loader.RobotVisualization
-#roboviz.modelFile = urdf_file
-#roboviz.jointsSize = 0.02
-#roboviz.frame = "Rover_base"
+roboviz = Vizkit.default_loader.RobotVisualization
+roboviz.modelFile = urdf_file
+roboviz.jointsSize = 0.02
+roboviz.frame = "Rover_base"
 
 ctrl_gui=Vizkit.default_loader.ControlUi
 ctrl_gui.initFromYaml(limits)
@@ -90,7 +89,7 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
 
     ctrl_gui.connect(SIGNAL('sendSignal()')) do
         port_writer.write(ctrl_gui.getJoints())
-        #roboviz.updateData(ctrl_gui.getJoints())
+        roboviz.updateData(ctrl_gui.getJoints())
     end
 
     sleep(5)

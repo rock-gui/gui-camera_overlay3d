@@ -9,6 +9,7 @@
 #include <osgDB/ReadFile>
 #include <QTimer>
 #include <osgGA/TrackballManipulator>
+#include <osg/Material>
 
 using namespace vizkit3d;
 
@@ -128,7 +129,7 @@ void CameraOverlay3D::createImagePlane(osg::Camera* camera, float distance)
     geom->setNormalBinding(osg::Geometry::BIND_OVERALL);
 
     osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
-    (*colors)[0].set(1.f, 1.f, 1.f, 1.f);
+    (*colors)[0].set(1.f, 1.f, 1.f, alpha_);
     geom->setColorArray(colors);
     geom->setColorBinding(osg::Geometry::BIND_OVERALL);
 
@@ -147,9 +148,25 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     // setup state
     osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
-    state->setMode(GL_DEPTH_TEST, ::osg::StateAttribute::OFF);
+    //state->setMode(GL_DEPTH_TEST, ::osg::StateAttribute::OFF);
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
     state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
+
+    osg::Material *material = (osg::Material *) image_plane_->getStateSet()->getAttribute(osg::StateAttribute::MATERIAL);
+    if(!material){
+        material = new osg::Material();
+    }
+
+
+    osg::ref_ptr<osg::Geometry> geom = (osg::Geometry*) image_plane_->getDrawable(0);
+    osg::ref_ptr<osg::Vec4Array> colors = osg::ref_ptr<osg::Vec4Array>(new osg::Vec4Array(1));
+    (*colors)[0].set(1.f, 1.f, 1.f, alpha_);
+    geom->setColorArray(colors);
+    geom->setColorBinding(osg::Geometry::BIND_OVERALL);
+
+    image_plane_->getStateSet()->setMode( GL_BLEND, osg::StateAttribute::ON );
+    image_plane_->getStateSet()->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+
 
     this->setDirty();
 }
@@ -168,6 +185,7 @@ CameraOverlay3D::CameraOverlay3D()
     root_ = osg::ref_ptr<osg::Group>(new osg::Group);
     image_plane_ = new osg::Geode();
     frustum_ = new osg::Node();
+    alpha_ = 0.5;
 }
 
 CameraOverlay3D::~CameraOverlay3D()

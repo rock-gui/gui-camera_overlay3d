@@ -48,6 +48,7 @@ private:
     osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera );
     void createImagePlane(osg::Camera* camera, float distance);
     void updateImage(osg::ref_ptr<osg::Image> img);
+    float alpha_;
 };
 }
 #endif

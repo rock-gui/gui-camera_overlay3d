@@ -42,7 +42,7 @@ private:
     osg::ref_ptr<osg::Geode> image_plane_;
     osg::ref_ptr<osg::Group> root_;
     osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera );
-    void createImagePlane(float l, float r, float t, float b, float z);
+    void createImagePlane(osg::Camera* camera, float distance);
     void updateImage(osg::ref_ptr<osg::Image> img);
 };
 }

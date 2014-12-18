@@ -12,40 +12,39 @@ using namespace vizkit3d;
 
 // Given a Camera, create a wireframe representation of its
 // view frustum. Create a default representation if camera==NULL.
+
+void frustum_at_depth(osg::Camera* camera, const float& distance, float &left, float &right,
+                      float &top, float &bottom){
+    osg::Matrixd proj;
+    proj = camera->getProjectionMatrix();
+    left = distance * (proj(2,0)-1.0) / proj(0,0);
+    right = distance * (1.0+proj(2,0)) / proj(0,0);
+    top = distance * (1.0+proj(2,1)) / proj(1,1);
+    bottom = distance * (proj(2,1)-1.0) / proj(1,1);
+}
+
 osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* camera )
 {
     // Projection and ModelView matrices
     osg::Matrixd proj;
     osg::Matrixd mv;
-    if (camera)
-    {
-        proj = camera->getProjectionMatrix();
-        mv = camera->getViewMatrix();
-    }
-    else
-    {
-        // Create some kind of reasonable default Projection matrix.
-        proj.makePerspective( 30., 1., 1., 10. );
-        // leave mv as identity
-    }
+    assert(camera);
+
+    proj = camera->getProjectionMatrix();
+    mv = camera->getViewMatrix();
+
 
     // Get near and far from the Projection matrix.
     const double near = proj(3,2) / (proj(2,2)-1.0);
     const double far = proj(3,2) / (1.0+proj(2,2));
 
     // Get the sides of the near plane.
-    const double nLeft = near * (proj(2,0)-1.0) / proj(0,0);
-    const double nRight = near * (1.0+proj(2,0)) / proj(0,0);
-    const double nTop = near * (1.0+proj(2,1)) / proj(1,1);
-    const double nBottom = near * (proj(2,1)-1.0) / proj(1,1);
+    float nLeft, nRight, nTop, nBottom;
+    frustum_at_depth(camera, near, nLeft, nRight, nTop, nBottom);
 
     // Get the sides of the far plane.
-    const double fLeft = far * (proj(2,0)-1.0) / proj(0,0);
-    const double fRight = far * (1.0+proj(2,0)) / proj(0,0);
-    const double fTop = far * (1.0+proj(2,1)) / proj(1,1);
-    const double fBottom = far * (proj(2,1)-1.0) / proj(1,1);
-
-    createImagePlane(nLeft, nRight, nTop, nBottom, near+0.00001);
+    float fLeft, fRight, fTop, fBottom;
+    frustum_at_depth(camera, far, fLeft, fRight, fTop, fBottom);
 
     // Our vertex array needs only 9 vertices: The origin, and the
     // eight corners of the near and far planes.
@@ -95,15 +94,19 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* cam
     return mt;
 }
 
-void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float z)
+void CameraOverlay3D::createImagePlane(osg::Camera* camera, float distance)
 {
+    float l, r, t, b;
+    //Place image plane in frustum at distance
+    frustum_at_depth(camera, distance, l, r, t, b);
+
     // create the box
     osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);
-    v->push_back( osg::Vec3(l,t,z));
-    v->push_back( osg::Vec3(r,t,z));
-    v->push_back( osg::Vec3(r,b,z));
-    v->push_back( osg::Vec3(l,b,z));
+    v->push_back( osg::Vec3(l,t,distance));
+    v->push_back( osg::Vec3(r,t,distance));
+    v->push_back( osg::Vec3(r,b,distance));
+    v->push_back( osg::Vec3(l,b,distance));
     geom->setVertexArray(v);
 
     // Draw a four-vertex quad from the stored data.
@@ -142,6 +145,7 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     // setup state
     osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
+    state->setMode(GL_DEPTH_TEST, ::osg::StateAttribute::OFF);
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
 
     //FIXME: Needed?
@@ -231,8 +235,8 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     float width = calib.width*scale;
     float cx = calib.cx*scale;
     float cy = calib.cy*scale;
-    float znear = 1.0f;
-    float zfar = 10000.0f;
+    float znear = 0.5f;
+    float zfar = 1000.0f;
 
     osg::Matrixd P(  2.0*fx/width,                 0,                         0,  0,
                       2.0*s/width,     2.0*fy/height,                         0,  0,
@@ -244,6 +248,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     //camera->setViewport( new osg::Viewport(0, 0, width, height) );
 
     frustum_ = makeFrustumFromCamera(camera);
+    createImagePlane(camera, 1);
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()

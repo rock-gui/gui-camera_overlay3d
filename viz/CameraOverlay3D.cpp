@@ -96,9 +96,6 @@ osg::ref_ptr<osg::Node> CameraOverlay3D::makeFrustumFromCamera( osg::Camera* cam
 
 void CameraOverlay3D::createImagePlane(float l, float r, float t, float b, float z)
 {
-    ::osg::PositionAttitudeTransform *transform = new ::osg::PositionAttitudeTransform();
-    transform->addChild(image_plane_);
-
     // create the box
     osg::ref_ptr<osg::Geometry> geom = osg::ref_ptr<osg::Geometry>(new osg::Geometry);
     osg::ref_ptr<osg::Vec3Array> v = osg::ref_ptr<osg::Vec3Array>(new osg::Vec3Array);

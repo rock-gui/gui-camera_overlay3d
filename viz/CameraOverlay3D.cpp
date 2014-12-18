@@ -180,6 +180,7 @@ void CameraOverlay3D::resetCamera()
 {
     Vizkit3DWidget * widget = dynamic_cast<Vizkit3DWidget *>(this->parent());
     widget->setCameraEye(0,0,0);
+    widget->setCameraUp(0,-1,0);
     widget->setCameraLookAt(0,0,1);
     this->setDirty();
 

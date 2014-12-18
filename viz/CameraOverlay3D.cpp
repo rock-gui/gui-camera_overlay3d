@@ -148,7 +148,6 @@ void CameraOverlay3D::updateImage(osg::ref_ptr<osg::Image> img)
     // setup state
     osg::ref_ptr<osg::StateSet> state = image_plane_->getOrCreateStateSet();
     state->setMode( GL_LIGHTING, ::osg::StateAttribute::OFF );
-    //state->setMode(GL_DEPTH_TEST, ::osg::StateAttribute::OFF);
     state->setTextureAttributeAndModes(0, background_image, osg::StateAttribute::ON);
     state->setTextureAttributeAndModes(0, texmat, osg::StateAttribute::ON);
 

@@ -22,6 +22,7 @@ public:
     Q_INVOKABLE void resetCamera();
     Q_INVOKABLE void setCameraFrame(std::string const &frame);
     Q_INVOKABLE void setCameraIntrinsics(frame_helper::CameraCalibration const &calib);
+    Q_INVOKABLE void setCameraIntrinsicsVect(std::vector<double> const &calib);
     Q_INVOKABLE void updateImageFromFile(std::string const &file_path);
     Q_INVOKABLE void updateData(base::samples::frame::Frame const &sample)
     {vizkit3d::Vizkit3DPlugin<base::samples::frame::Frame>::updateData(sample);}
@@ -40,7 +41,8 @@ private:
     osg::ref_ptr<osg::Node> frustum_;
     osg::ref_ptr<osg::Geode> image_plane_;
     osg::ref_ptr<osg::Group> root_;
-    void createImagePlane();
+    osg::ref_ptr<osg::Node> makeFrustumFromCamera( osg::Camera* camera );
+    void createImagePlane(osg::Camera* camera, float distance);
     void updateImage(osg::ref_ptr<osg::Image> img);
 };
 }

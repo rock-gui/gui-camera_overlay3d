@@ -1,6 +1,8 @@
-require 'vizkit'
+require 'orocos'
 require 'transformer/runtime'
 require 'pry'
+
+Orocos.initialize
 
 Orocos.load_typekit('robot_frames')
 Orocos.load_typekit('aruco')
@@ -49,6 +51,26 @@ chains.each do |c|
 end
 
 #############################################################
+Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk"
+sleep(2)
+
+#Make robot controllable via gui. Update FK and visualization
+fk = Orocos.name_service.get 'fk'
+fk.chains = chains
+fk.urdf_file = urdf_file
+fk.configure
+fk.start
+
+Orocos.transformer.update_configuration_state
+bc=Orocos.name_service.get(Transformer.broadcaster_name)
+bc.start
+sleep(1)
+bc.setConfiguration Orocos.transformer.configuration_state
+sleep(2)
+
+#############################################################
+
+require 'vizkit'
 
 overlay = Vizkit.default_loader.CameraOverlay3D
 overlay.frame = "LeftCamera"
@@ -65,7 +87,6 @@ ctrl_gui.initFromYaml(limits)
 
 ##############################################################
 
-Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do
   begin
     #Change images every 5 seconds
     t=Qt::Timer.new
@@ -78,12 +99,7 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
        puts "Set image #{current_image}"
     end
 
-    #Make robot controllable via gui. Update FK and visualization
-    fk = Orocos.name_service.get 'fk'
-    fk.chains = chains
-    fk.urdf_file = urdf_file
-    fk.configure
-    fk.start
+    
     port_writer = fk.input.writer
 
     ctrl_gui.enableSendCBs(true)
@@ -107,14 +123,9 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
 
     sleep(5)
 
-    #Orocos.transformer.update_configuration_state
-    bc=Orocos.name_service.get(Transformer.broadcaster_name)
-    #bc.start
-    #sleep(1)
-    #bc.setConfiguration Orocos.transformer.configuration_state
     Vizkit.exec
   rescue Exception => ex
     puts ex
   end
-end
+
 

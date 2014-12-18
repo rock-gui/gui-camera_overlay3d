@@ -222,34 +222,28 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     assert(camera);
     camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
-    float fx = calib.fx;
-    float fy = calib.fy;
+    float scale = 1;//widget->getView(0)->getCamera()->getViewport()->height() / calib.height;
+
+    float fx = calib.fx*scale;
+    float fy = calib.fy*scale;
     float s = 0;
-    float height = widget->getView(0)->getCamera()->getViewport()->height();
-    float width = calib.width * (height/calib.height);
-    float cx = calib.cx;
-    float cy = calib.cy;
+    float height = calib.height*scale;
+    float width = calib.width*scale;
+    float cx = calib.cx*scale;
+    float cy = calib.cy*scale;
     float znear = 1.0f;
     float zfar = 10000.0f;
 
-    /*widget->setMinimumWidth(width);
-    widget->setMinimumHeight(height);
-    widget->setMaximumWidth(width);
-    widget->setMaximumHeight(height);
-    camera->setViewport( new osg::Viewport(0, 0, width, height) );*/
+    osg::Matrixd P(  2.0*fx/width,                 0,                         0,  0,
+                      2.0*s/width,     2.0*fy/height,                         0,  0,
+                   1-(2*cx/width), 1-(2.0*cy/height), (zfar+znear)/(znear-zfar), -1,
+                                0,                 0, 2*zfar*znear/(znear-zfar),  0);
 
-    osg::Matrixd P;
-    //FIXME: Maybe transpose?
-    P.set(          2*fx/width,                      0,                              0,  0,
-                    -2*s/width,            -2*fy/height,                              0,  0,
-          (width - 2*cx)/width, (height - 2*cy)/height, (-zfar - znear)/(zfar - znear), -1,
-                    0,                      0,   (-2*zfar*znear)/(zfar-znear),  0);
 
     camera->setProjectionMatrix(P);
+    //camera->setViewport( new osg::Viewport(0, 0, width, height) );
 
     frustum_ = makeFrustumFromCamera(camera);
-//    root_->addChild(frustum_);
-//    this->setDirty();
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()

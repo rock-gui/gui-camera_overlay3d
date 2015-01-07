@@ -1,7 +1,8 @@
 require 'vizkit'
 require 'transformer/runtime'
-require 'pry'
 
+Orocos::CORBA.name_service.ip = "127.0.0.1"
+Orocos.initialize
 Orocos.load_typekit('robot_frames')
 Orocos.load_typekit('aruco')
 
@@ -45,13 +46,13 @@ chains.push c.dup
 
 #Set up transformer config
 chains.each do |c|
-    Orocos.transformer.manager.conf.dynamic_transform "fk.#{c.name}",c.root_link => c.tip_link
+    Orocos.transformer.manager.conf.dynamic_transform "fk.#{c.name}",c.tip_link => c.root_link
 end
 
 #############################################################
 
 overlay = Vizkit.default_loader.CameraOverlay3D
-overlay.frame = "LeftCamera"
+#overlay.frame = "LeftCamera"
 overlay.setCameraIntrinsics(camera_calib)
 
 roboviz = Vizkit.default_loader.RobotVisualization
@@ -64,7 +65,7 @@ ctrl_gui.initFromYaml(limits)
 
 ##############################################################
 
-Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do
+Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do 
   begin
     #Change images every 5 seconds
     t=Qt::Timer.new
@@ -94,11 +95,16 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
 
     sleep(5)
 
-    #Orocos.transformer.update_configuration_state
+    Orocos.transformer.update_configuration_state
     bc=Orocos.name_service.get(Transformer.broadcaster_name)
-    #bc.start
-    #sleep(1)
-    #bc.setConfiguration Orocos.transformer.configuration_state
+    bc.start
+    sleep(1)
+    bc.setConfiguration Orocos.transformer.configuration_state
+
+    
+    #dummy = Orocos::TaskContext.get "dummy"
+    #Orocos.transformer.setup(dummy)
+
     Vizkit.exec
   rescue Exception => ex
     puts ex

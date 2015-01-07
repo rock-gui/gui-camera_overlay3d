@@ -1,0 +1,122 @@
+#! /usr/bin/env ruby
+
+require 'vizkit'
+require 'optparse'
+require 'transformer/runtime'
+
+hostname = nil
+urdf_file = nil
+camera_frame = nil
+calib_prop = nil
+state_task_name = nil
+state_port_name = nil
+camera_task_name = nil
+image_port_name = nil
+
+def err(msg, options)
+   puts "Usage: "
+   puts options
+   raise(msg)
+end
+
+options = OptionParser.new do |opt|
+    opt.banner = <<-EOD
+camera_overlay [options] <camera_task> <image_port> <calibration_property>
+    EOD
+    opt.on '--host=HOSTNAME', String, 'the host we should contact to find RTT tasks' do |host|
+        hostname = host
+    end
+    opt.on '--urdf=PATH_TO_URDF_FILE', String, 'displays the robot urdf file in the same window' do |urdf|
+        urdf_file = urdf
+    end
+    opt.on '--camera_frame=FRAME', String, 'frame in which the camera image should be displayed' do |frame|
+        camera_frame = frame
+    end
+    opt.on '--joint_state_port=TASK_CONTEXT_NAME:PORT_NAME', '-s=TASK_CONTEXT_NAME:PORT_NAME' , 'Force joint state port to be PORT_NAME of task TASK_CONTEXT_NAME' do |val|
+        splitted = val.split(':')
+        if splitted.size != 2
+            raise("Definition of joint state port must follow the pattern 'TASK_CONTEXT_NAME:PORT_NAME'. Example: --joint_state_port=my_task:the_port")
+        end
+        state_task_name = splitted[0]
+        state_port_name = splitted[1]
+    end
+end
+
+args = options.parse(ARGV)
+
+camera_task_name = args.shift
+image_port_name = args.shift
+calib_prop = args.shift
+
+if not camera_task_name
+   err("No camera task name given", options)
+end
+
+if not image_port_name
+   err("No image port name given", options)
+end
+
+if not calib_prop
+   err("No camera calibration given", options)
+end
+
+################################################################################################
+
+if hostname
+    Orocos::CORBA.name_service.ip = hostname
+end
+Orocos.initialize
+Orocos.load_typekit("aruco")
+
+view3d = Vizkit.vizkit3d_widget
+view3d.show
+overlay = Vizkit.default_loader.CameraOverlay3D
+if camera_frame
+    overlay.frame = camera_frame
+end
+
+camera_task = Orocos::TaskContext.get camera_task_name
+overlay.setCameraIntrinsics(camera_task.property(calib_prop))
+
+#camera_calib = Types::FrameHelper::CameraCalibration.new
+#camera_calib.fx = 523.55539
+#camera_calib.fy = 524.20812
+#camera_calib.cx = 376.17248
+#camera_calib.cy = 284.91054
+#camera_calib.d0 = -0.36903
+#camera_calib.d1 = 0.20010
+#camera_calib.d2 = 0.00035
+#camera_calib.d3 = -0.00019
+#camera_calib.width = 782.0
+#camera_calib.height = 582.0
+#overlay.setCameraIntrinsics(camera_calib)
+
+if urdf_file
+   roboviz = Vizkit.default_loader.RobotVisualization
+   roboviz.modelFile = urdf_file
+   roboviz.jointsSize = 0.02
+   roboviz.frame = "Rover_base"
+
+   if not state_task_name
+      puts "URDF file, but no joint state task has been given. Robot visualization will not be updated with joint data"
+   else
+      joint_state_task = Orocos::Async.get state_task_name
+      joint_state_task.port(state_port_name).on_data do |data|
+          roboviz.updateData(data)
+      end
+   end
+end
+
+camera_task_proxy = Orocos::Async.proxy camera_task_name
+camera_task_proxy.port(image_port_name).on_data do |data|
+   puts "updating image"
+   overlay.updateData(data)
+end
+
+#Orocos.transformer.update_configuration_state
+#bc=Orocos.name_service.get(Transformer.broadcaster_name)
+#sleep(1)
+#bc.setConfiguration Orocos.transformer.configuration_state
+
+Vizkit.exec
+

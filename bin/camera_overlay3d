@@ -63,6 +63,7 @@ end
 ################################################################################################
 
 if hostname
+    Orocos::CORBA.max_message_size = 8400000
     Orocos::CORBA.name_service.ip = hostname
 end
 Orocos.initialize
@@ -76,7 +77,8 @@ if camera_frame
 end
 
 camera_task = Orocos::TaskContext.get camera_task_name
-overlay.setCameraIntrinsics(camera_task.property(calib_prop))
+camera_calib = camera_task.property(calib_prop).read
+overlay.setCameraIntrinsics(camera_calib)
 
 #camera_calib = Types::FrameHelper::CameraCalibration.new
 #camera_calib.fx = 523.55539
@@ -109,14 +111,8 @@ end
 
 camera_task_proxy = Orocos::Async.proxy camera_task_name
 camera_task_proxy.port(image_port_name).on_data do |data|
-   puts "updating image"
    overlay.updateData(data)
 end
-
-#Orocos.transformer.update_configuration_state
-#bc=Orocos.name_service.get(Transformer.broadcaster_name)
-#sleep(1)
-#bc.setConfiguration Orocos.transformer.configuration_state
 
 Vizkit.exec
 

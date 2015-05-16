@@ -186,6 +186,7 @@ CameraOverlay3D::CameraOverlay3D()
     image_plane_ = new osg::Geode();
     frustum_ = new osg::Node();
     alpha_ = 0.5;
+    perform_undistortion_=false;
 }
 
 CameraOverlay3D::~CameraOverlay3D()
@@ -200,8 +201,10 @@ void CameraOverlay3D::setCameraFrame(std::string const &frame)
     parent->setVisualizationFrame(QString::fromStdString(frame));
 }
 
-void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib)
+void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib, bool perform_undistortion)
 {
+    perform_undistortion_ = perform_undistortion;
+
     intrinsics_ = cv::Mat(3,3,CV_64F);
     intrinsics_.at<double>(0,0) = calib.fx;
     intrinsics_.at<double>(0,1) = 0.0;
@@ -342,8 +345,14 @@ void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
     input_image_cv_ = frame_helper_.convertToCvMat(input_frame_);
 
     //Undistort and flip around x-axis
-    cv::undistort(input_image_cv_, undistorted_image_cv_, intrinsics_, dist_coef_);
-    cv::flip(undistorted_image_cv_, rotated_image_cv_, 0);
+    if(perform_undistortion_){
+        cv::undistort(input_image_cv_, undistorted_image_cv_, intrinsics_, dist_coef_);
+        cv::flip(undistorted_image_cv_, rotated_image_cv_, 0);
+    }
+    else{
+        cv::flip(undistorted_image_cv_, rotated_image_cv_, 0);
+    }
+
 
     //Convert image to osg::Image
     osg::ref_ptr<osg::Image> osg_image = osg::ref_ptr<osg::Image>(new osg::Image);

@@ -6,12 +6,17 @@ require 'transformer/runtime'
 
 hostname = nil
 urdf_file = nil
-camera_frame = nil
+camera_segment = nil
 calib_prop = nil
 state_task_name = nil
 state_port_name = nil
 camera_task_name = nil
 image_port_name = nil
+perform_undistortion = false
+use_transformer = false
+robot_visualization_frame = nil
+camera_visualization_frame = nil
+robot_root = nil
 
 def err(msg, options)
    puts "Usage: "
@@ -22,6 +27,9 @@ end
 options = OptionParser.new do |opt|
     opt.banner = <<-EOD
 camera_overlay [options] <camera_task> <image_port> <calibration_property>
+
+calibration_property is the name of the property, where the camera calibration can be found on camera_task
+robot_visualization_frame is the name of the frame 
     EOD
     opt.on '--host=HOSTNAME', String, 'the host we should contact to find RTT tasks' do |host|
         hostname = host
@@ -29,16 +37,28 @@ camera_overlay [options] <camera_task> <image_port> <calibration_property>
     opt.on '--urdf=PATH_TO_URDF_FILE', String, 'displays the robot urdf file in the same window' do |urdf|
         urdf_file = urdf
     end
-    opt.on '--camera_frame=FRAME', String, 'frame in which the camera image should be displayed' do |frame|
-        camera_frame = frame
-    end
-    opt.on '--joint_state_port=TASK_CONTEXT_NAME:PORT_NAME', '-s=TASK_CONTEXT_NAME:PORT_NAME' , 'Force joint state port to be PORT_NAME of task TASK_CONTEXT_NAME' do |val|
+    opt.on '--joint_state_port=TASK_CONTEXT_NAME:PORT_NAME', '-s=TASK_CONTEXT_NAME:PORT_NAME' , 'Force joint state port to be PORT_NAME of task TASK_CONTEXT_NAME. Requried if URDF is used.' do |val|
         splitted = val.split(':')
         if splitted.size != 2
             raise("Definition of joint state port must follow the pattern 'TASK_CONTEXT_NAME:PORT_NAME'. Example: --joint_state_port=my_task:the_port")
         end
         state_task_name = splitted[0]
         state_port_name = splitted[1]
+    end
+    opt.on '--perform_undistortion' do
+      perform_undistortion = true
+    end
+    opt.on '--use_transformer' do
+      use_transformer = true
+    end
+    opt.on '--robot_transformer_frame=NAME', String, 'Frame (from transformer) that should be used as visualization frame for the robot. Requried if URDF and if transformer is used.' do |val|
+      robot_visualization_frame = val
+    end
+    opt.on '--camera_transformer_frame=NAME', String, 'Frame(from transformer) that should be used as visualization frame for the camera. Requried if URDF and transformer is used.' do |val|
+      camera_visualization_frame = val
+    end
+    opt.on '--camera_segment=NAME', String, 'Segement in URDF, that represetns the camera location. Requried if URDF is used, and transformer is NOT used.' do |val|
+      camera_segment=val
     end
 end
 
@@ -60,6 +80,7 @@ if not calib_prop
    err("No camera calibration given", options)
 end
 
+
 ################################################################################################
 
 if hostname
@@ -67,37 +88,35 @@ if hostname
     Orocos::CORBA.name_service.ip = hostname
 end
 Orocos.initialize
-Orocos.load_typekit("aruco")
+Orocos.load_typekit("base")
 
 view3d = Vizkit.vizkit3d_widget
 view3d.show
 overlay = Vizkit.default_loader.CameraOverlay3D
-if camera_frame
-    overlay.frame = camera_frame
+if use_transformer
+    raise "camera_visualization_frame not specified" if not camera_visualization_frame
+    overlay.frame = camera_visualization_frame
+else
+    raise "camera_segment not specified" if not camera_segment
+    overlay.frame = camera_segment
 end
 
 camera_task = Orocos::TaskContext.get camera_task_name
 camera_calib = camera_task.property(calib_prop).read
-overlay.setCameraIntrinsics(camera_calib)
-
-#camera_calib = Types::FrameHelper::CameraCalibration.new
-#camera_calib.fx = 523.55539
-#camera_calib.fy = 524.20812
-#camera_calib.cx = 376.17248
-#camera_calib.cy = 284.91054
-#camera_calib.d0 = -0.36903
-#camera_calib.d1 = 0.20010
-#camera_calib.d2 = 0.00035
-#camera_calib.d3 = -0.00019
-#camera_calib.width = 782.0
-#camera_calib.height = 582.0
-#overlay.setCameraIntrinsics(camera_calib)
+overlay.setCameraIntrinsics(camera_calib, perform_undistortion)
 
 if urdf_file
    roboviz = Vizkit.default_loader.RobotVisualization
    roboviz.modelFile = urdf_file
    roboviz.jointsSize = 0.02
-   roboviz.frame = "Rover_base"
+   if(use_transformer)
+        raise "robot_visualization_frame not specified" if not robot_visualization_frame
+        roboviz.frame = robot_visualization_frame
+
+   else
+        robot_root = roboviz.getRootLink
+        roboviz.frame = robot_root
+   end
 
    if not state_task_name
       puts "URDF file, but no joint state task has been given. Robot visualization will not be updated with joint data"
@@ -105,6 +124,11 @@ if urdf_file
       joint_state_task = Orocos::Async.get state_task_name
       joint_state_task.port(state_port_name).on_data do |data|
           roboviz.updateData(data)
+          if not use_transformer
+              t = roboviz.getTranslation(camera_segment, robot_root)
+              r = roboviz.getRotation(camera_segment, robot_root)
+              view3d.setTransformation(camera_segment, robot_root, t, r)
+          end
       end
    end
 end

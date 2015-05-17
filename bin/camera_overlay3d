@@ -18,6 +18,7 @@ robot_visualization_frame = nil
 camera_visualization_frame = nil
 robot_root = nil
 disable_transformer = false
+draw_segments = []
 
 def err(msg, options)
    puts "Usage: "
@@ -63,6 +64,9 @@ robot_visualization_frame is the name of the frame
     end
     opt.on '--camera_segment=NAME', String, 'Segement in URDF, that represetns the camera location. Requried if URDF is used, and transformer is NOT used.' do |val|
       camera_segment=val
+    end
+    opt.on '--draw_segment=NAME', String, 'Draw an additional segment of the robot' do |val|
+       draw_segments.push val
     end
 end
 
@@ -139,9 +143,12 @@ if urdf_file
       joint_state_task.port(state_port_name).on_data do |data|
           roboviz.updateData(data)
           if not use_transformer
-              t = roboviz.getTranslation(camera_segment, robot_root)
-              r = roboviz.getRotation(camera_segment, robot_root)
-              view3d.setTransformation(camera_segment, robot_root, t, r)
+              segs = [camera_segment]+draw_segments
+              segs.each do |seg|
+                t = roboviz.getTranslation(seg, robot_root)
+                r = roboviz.getRotation(seg, robot_root)
+                view3d.setTransformation(seg, robot_root, t, r)
+              end
           end
       end
    end

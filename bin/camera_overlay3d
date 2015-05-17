@@ -17,6 +17,7 @@ use_transformer = false
 robot_visualization_frame = nil
 camera_visualization_frame = nil
 robot_root = nil
+disable_transformer = false
 
 def err(msg, options)
    puts "Usage: "
@@ -48,8 +49,11 @@ robot_visualization_frame is the name of the frame
     opt.on '--perform_undistortion' do
       perform_undistortion = true
     end
-    opt.on '--use_transformer' do
+    opt.on '--use_transformer', "Don't calculate camera pose, but retrieve it from Transformer. If this is set, --camera_transformer_frame and --robot_transformer_frame must be set." do
       use_transformer = true
+    end
+    opt.on '--disable_transformer', "Disables the transformer completely. No transformations published in transformer will be displayed! Obviously does not work well together with --use_tansformer." do
+      disable_transformer = true
     end
     opt.on '--robot_transformer_frame=NAME', String, 'Frame (from transformer) that should be used as visualization frame for the robot. Requried if URDF and if transformer is used.' do |val|
       robot_visualization_frame = val
@@ -90,9 +94,19 @@ end
 Orocos.initialize
 Orocos.load_typekit("base")
 
+if disable_transformer
+    Vizkit.vizkit3d_transformer_broadcaster_name = ["This is a stupid hack", "to trick vizkit to not update transformations via tranformer. I have not found any property to disable it... so..."]
+end
+
 view3d = Vizkit.vizkit3d_widget
+view3d.setAxes(false)
+view3d.setCameraManipulator("Trackball")
+view3d.grid.enabled = false
 view3d.show
 overlay = Vizkit.default_loader.CameraOverlay3D
+if disable_transformer
+    view3d.setTransformer(false)
+end
 if use_transformer
     raise "camera_visualization_frame not specified" if not camera_visualization_frame
     overlay.frame = camera_visualization_frame

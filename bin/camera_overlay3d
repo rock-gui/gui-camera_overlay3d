@@ -121,7 +121,7 @@ if urdf_file
    if not state_task_name
       puts "URDF file, but no joint state task has been given. Robot visualization will not be updated with joint data"
    else
-      joint_state_task = Orocos::Async.get state_task_name
+      joint_state_task = Orocos::Async.proxy state_task_name
       joint_state_task.port(state_port_name).on_data do |data|
           roboviz.updateData(data)
           if not use_transformer

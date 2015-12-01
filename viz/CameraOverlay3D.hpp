@@ -28,6 +28,7 @@ public:
     Q_INVOKABLE void updateImageFromFile(std::string const &file_path);
     Q_INVOKABLE void updateData(base::samples::frame::Frame const &sample)
     {vizkit3d::Vizkit3DPlugin<base::samples::frame::Frame>::updateData(sample);}
+    Q_INVOKABLE void writeImage(std::string const &file_path);
 
 public slots:
 

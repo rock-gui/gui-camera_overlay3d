@@ -11,8 +11,54 @@
 #include <osg/Material>
 #include <yaml-cpp/yaml.h>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <osgDB/WriteFile>
+#include <osg/CameraNode>
 
 using namespace vizkit3d;
+
+class SnapImageDrawCallback : public osg::CameraNode::DrawCallback
+{
+public:
+
+    SnapImageDrawCallback()
+    {
+        _snapImageOnNextFrame = false;
+    }
+
+    void setFileName(const std::string& filename) { _filename = filename; }
+    const std::string& getFileName() const { return _filename; }
+
+    void setSnapImageOnNextFrame(bool flag) { _snapImageOnNextFrame = flag; }
+    bool getSnapImageOnNextFrame() const { return _snapImageOnNextFrame; }
+
+    virtual void operator () (const osg::CameraNode& camera) const
+    {
+        if (!_snapImageOnNextFrame) return;
+
+        int x,y,width,height;
+        x = camera.getViewport()->x();
+        y = camera.getViewport()->y();
+        width = camera.getViewport()->width();
+        height = camera.getViewport()->height();
+
+        osg::ref_ptr<osg::Image> image = new osg::Image;
+        image->readPixels(x,y,width,height,GL_RGB,GL_UNSIGNED_BYTE);
+
+        if (osgDB::writeImageFile(*image,_filename))
+        {
+            std::cout  << "Saved image to `"<<_filename<<"`"<< std::endl;
+        }
+
+        _snapImageOnNextFrame = false;
+    }
+
+protected:
+
+    std::string _filename;
+    mutable bool        _snapImageOnNextFrame;
+
+
+};
 
 // Given a Camera, create a wireframe representation of its
 // view frustum. Create a default representation if camera==NULL.
@@ -369,6 +415,22 @@ void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
         std::cerr << "Image format '"<<mode<<"' not supported" << std::endl;
     }
     updateImage(osg_image);
+}
+
+void CameraOverlay3D::writeImage(std::string const &file_path){
+    osg::ref_ptr<SnapImageDrawCallback> snapImageDrawCallback = new
+            SnapImageDrawCallback();
+    camera->setPostDrawCallback( (snapImageDrawCallback.get()));
+    if(snapImageDrawCallback.get())
+    {
+        std::cout << "make screenshot" << std::endl;
+        snapImageDrawCallback->setFileName(file_path);
+        snapImageDrawCallback->setSnapImageOnNextFrame(true);
+    }
+    else
+    {
+        std::cout << "Warning: no make screenshot" << std::endl;
+    }
 }
 
 //Macro that makes this plugin loadable in ruby, this is optional.

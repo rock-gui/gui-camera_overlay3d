@@ -28,28 +28,16 @@ calib = Types::FrameHelper::CameraCalibration.new
 
 image_files = Dir.entries('images').map do |f| "images/#{f}" if f.split('.')[-1]=='png' end.compact!.reverse!
 
-#Setup chains we want to publish
-chains=[]
-c=Types::RobotFrames::Chain.new
-c.root_link = "Rover_base"
-c.name = "cam"
-c.tip_link = "LeftCamera"
-chains.push c.dup
+robot_root = "Rover_base"
+camera_segment = "LeftCamera"
 
-c.name = "left_arm"
-c.tip_link = "Wrist_l"
-chains.push c.dup
-
-c.name = "right_arm"
-c.tip_link = "Wrist_r"
-chains.push c.dup
-
-#Set up transformer config
-chains.each do |c|
-    Orocos.transformer.manager.conf.dynamic_transform "fk.#{c.name}",c.tip_link => c.root_link
-end
 
 #############################################################
+view3d = Vizkit.vizkit3d_widget
+view3d.setAxes(false)
+view3d.setCameraManipulator("Trackball")
+view3d.grid.enabled = false
+view3d.show
 
 overlay = Vizkit.default_loader.CameraOverlay3D
 #overlay.frame = "LeftCamera"
@@ -64,8 +52,27 @@ ctrl_gui=Vizkit.default_loader.ControlUi
 ctrl_gui.initFromYaml(limits)
 
 ##############################################################
+#For testing frame writing, export written frame to ruby port
+Orocos.load_typekit 'base'
+require 'frame_helper_ruby'
+export_task = Orocos::RubyTaskContext.new "camera_overlay"
+frame_sample = Types::Base::Samples::Frame::Frame.new
+export_task.create_output_port 'frame', "/base/samples/frame/Frame"
+export_task.configure
+export_task.start
 
-Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" do 
+export_timer=Qt::Timer.new
+export_timer.connect(SIGNAL("timeout()")) do
+    puts "writing?"
+    overlay.writeImage 'the_file.png'
+    FrameHelper.load_frame 'the_file.png', frame_sample
+    export_task.frame.write frame_sample
+end
+export_timer.start(100)
+##############################################################
+
+
+Orocos.run do 
   begin
     #Change images every 5 seconds
     t=Qt::Timer.new
@@ -78,32 +85,21 @@ Orocos.run Transformer.broadcaster_name, 'robot_frames::ChainPublisher' => "fk" 
        puts "Set image #{current_image}"
     end
 
-    #Make robot controllable via gui. Update FK and visualization
-    fk = Orocos.name_service.get 'fk'
-    fk.chains = chains
-    fk.urdf_file = urdf_file
-    fk.configure
-    fk.start
-    port_writer = fk.input.writer
-
     ctrl_gui.enableSendCBs(true)
 
     ctrl_gui.connect(SIGNAL('sendSignal()')) do
-        port_writer.write(ctrl_gui.getJoints())
-        roboviz.updateData(ctrl_gui.getJoints())
+        data = ctrl_gui.getJoints()
+
+        roboviz.updateData(data)
+        segs = [camera_segment]
+        segs.each do |seg|
+            t = roboviz.getTranslation(seg, robot_root)
+            r = roboviz.getRotation(seg, robot_root)
+            view3d.setTransformation(seg, robot_root, t, r)
+        end
     end
 
     sleep(5)
-
-    Orocos.transformer.update_configuration_state
-    bc=Orocos.name_service.get(Transformer.broadcaster_name)
-    bc.start
-    sleep(1)
-    bc.setConfiguration Orocos.transformer.configuration_state
-
-    
-    #dummy = Orocos::TaskContext.get "dummy"
-    #Orocos.transformer.setup(dummy)
 
     Vizkit.exec
   rescue Exception => ex

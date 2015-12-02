@@ -5,7 +5,7 @@ includedir=${prefix}/include
 
 Name: camera_overlay3d-viz
 Description: vizKit plugin for the camera_overlay3d library
-Requires: camera_overlay3d @PKGCONFIG_DEPS@
+Requires: @PKGCONFIG_DEPS@
 Version: @PROJECT_VERSION@
 Libs: -L${libdir} -lcamera_overlay3d-viz
 Cflags: -I${includedir}

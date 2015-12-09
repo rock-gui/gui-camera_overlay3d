@@ -299,7 +299,7 @@ void CameraOverlay3D::setCameraFrame(std::string const &frame)
     parent->setVisualizationFrame(QString::fromStdString(frame));
 }
 
-void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib, bool perform_undistortion)
+void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const &calib, bool perform_undistortion, float image_plane_distance)
 {
     perform_undistortion_ = perform_undistortion;
 
@@ -406,7 +406,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     //camera->setViewport( new osg::Viewport(0, 0, width, height) );
 
     frustum_->addChild(makeFrustumFromCamera(camera));
-    createImagePlane(camera, 1);
+    createImagePlane(camera, image_plane_distance);
 }
 
 osg::ref_ptr<osg::Node> CameraOverlay3D::createMainNode()
@@ -426,7 +426,6 @@ void CameraOverlay3D::updateImageFromFile(std::string const &file_path)
 
 void CameraOverlay3D::updateMainNode ( osg::Node* node )
 {
-    osg::Group* group = static_cast<osg::Group*>(node);
 }
 
 void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)

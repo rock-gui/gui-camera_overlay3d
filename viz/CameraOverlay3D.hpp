@@ -24,7 +24,7 @@ public:
     ~CameraOverlay3D();
 
     Q_INVOKABLE void setCameraFrame(std::string const &frame);
-    Q_INVOKABLE void setCameraIntrinsics(frame_helper::CameraCalibration const &calib, bool perform_undistortion=true);
+    Q_INVOKABLE void setCameraIntrinsics(frame_helper::CameraCalibration const &calib, bool perform_undistortion=true, float image_plane_distance=1.0);
     Q_INVOKABLE void updateImageFromFile(std::string const &file_path);
     Q_INVOKABLE void updateData(base::samples::frame::Frame const &sample)
     {vizkit3d::Vizkit3DPlugin<base::samples::frame::Frame>::updateData(sample);}

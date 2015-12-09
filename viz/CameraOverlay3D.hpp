@@ -48,7 +48,7 @@ private:
     cv::Mat undistorted_image_cv_, rotated_image_cv_, input_image_cv_;
     cv::Mat intrinsics_, dist_coef_;
     frame_helper::FrameHelper frame_helper_;
-    osg::ref_ptr<osg::Node> frustum_;
+    osg::ref_ptr<osg::Group> frustum_;
     osg::ref_ptr<osg::Geode> image_plane_;
     osg::ref_ptr<osg::Group> root_;
     ::osg::Camera* camera;

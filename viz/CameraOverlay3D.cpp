@@ -282,7 +282,7 @@ CameraOverlay3D::CameraOverlay3D()
 {
     root_ = osg::ref_ptr<osg::Group>(new osg::Group);
     image_plane_ = new osg::Geode();
-    frustum_ = new osg::Node();
+    frustum_ = new osg::Group();
     alpha_ = 0.5;
     perform_undistortion_=false;
 }
@@ -405,7 +405,7 @@ void CameraOverlay3D::setCameraIntrinsics(frame_helper::CameraCalibration const 
     camera->setProjectionMatrix(P);
     //camera->setViewport( new osg::Viewport(0, 0, width, height) );
 
-    frustum_ = makeFrustumFromCamera(camera);
+    frustum_->addChild(makeFrustumFromCamera(camera));
     createImagePlane(camera, 1);
 }
 

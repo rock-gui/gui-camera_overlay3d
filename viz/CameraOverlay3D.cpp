@@ -13,6 +13,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <osgDB/WriteFile>
 #include <osg/CameraNode>
+#include <OpenThreads/Mutex>
 
 using namespace vizkit3d;
 
@@ -23,13 +24,21 @@ public:
     SnapImageDrawCallback()
     {
         _snapImageOnNextFrame = false;
+        _image = new osg::Image;
     }
 
-    void setFileName(const std::string& filename) { _filename = filename; }
-    const std::string& getFileName() const { return _filename; }
-
-    void setSnapImageOnNextFrame(bool flag) { _snapImageOnNextFrame = flag; }
-    bool getSnapImageOnNextFrame() const { return _snapImageOnNextFrame; }
+    /**
+     * @brief Set weather to snap or not snap next rendered image
+     * @param flag: True if you want to snap next image
+     */
+    void setSnapping(bool flag) { _snapImageOnNextFrame = flag; }
+    bool getSnapping() const { return _snapImageOnNextFrame; }
+    /**
+     * @brief Set whether to continue or nor continue snapping after successful snap
+     * @param flag: Reset (stop) snappig after successful snap?
+     */
+    void setResetSnapping(bool flag) { _resetSnappingAfterFrame = flag; }
+    bool getResetSnapping() const { return _resetSnappingAfterFrame; }
 
     virtual void operator () (const osg::CameraNode& camera) const
     {
@@ -41,23 +50,66 @@ public:
         width = camera.getViewport()->width();
         height = camera.getViewport()->height();
 
-        osg::ref_ptr<osg::Image> image = new osg::Image;
-        image->readPixels(x,y,width,height,GL_RGB,GL_UNSIGNED_BYTE);
+        _imageMutex.lock();
+        _image->readPixels(x,y,width,height,GL_RGB,GL_UNSIGNED_BYTE);
+        _lastSnap = base::Time::now();
+        _imageMutex.unlock();
 
-        if (osgDB::writeImageFile(*image,_filename))
-        {
-            std::cout  << "Saved image to `"<<_filename<<"`"<< std::endl;
+        if(_resetSnappingAfterFrame)
+            _snapImageOnNextFrame = false;
+    }
+
+    /**
+     * @brief Retrieve previsouly captured image
+     * * Allocation of the variable 'buffer' is performed within the function.
+     * 'setSnapImageOnNextFrame' must have been called before
+     *
+     * @param buffer uninitialized buffer to store image in
+     * @param wait_for_new true if you want to wait for a new image (instead of using a previously snapped one)
+     */
+    void getImage(osg::ref_ptr<osg::Image>& buffer, bool wait_for_new=true){
+        if(wait_for_new){
+            waitForNew();
         }
 
-        _snapImageOnNextFrame = false;
+        _imageMutex.lock();
+        buffer = osg::ref_ptr<osg::Image>(new osg::Image(*_image));
+        _imageMutex.unlock();
+    }
+
+    void waitForNew(){
+        setSnapping(true);
+        base::Time now = base::Time::now();
+        while(_lastSnap < now){
+            usleep(100);
+        }
+    }
+
+    /**
+     * @brief Write current previously captured image to disk
+     * @param filename: Where to write to. extension should be an common image extension (eg. filename.png)
+     */
+    bool write(const std::string& filename, bool wait_for_new=true){
+        if(wait_for_new){
+            waitForNew();
+        }
+
+        _imageMutex.lock();
+        if (osgDB::writeImageFile(*_image, filename)) {
+            std::cout  << "Saved image to `" << filename << "`" << std::endl;
+        }
+        _imageMutex.unlock();
+        return true;
     }
 
 protected:
 
     std::string _filename;
     mutable bool        _snapImageOnNextFrame;
-
-
+    mutable bool        _resetSnappingAfterFrame;
+    mutable OpenThreads::Mutex _imageMutex;
+    osg::ref_ptr<osg::Image> _image;
+    mutable base::Time _lastSnap;
 };
 
 // Given a Camera, create a wireframe representation of its
@@ -424,12 +476,25 @@ void CameraOverlay3D::writeImage(std::string const &file_path){
     if(snapImageDrawCallback.get())
     {
         std::cout << "make screenshot" << std::endl;
-        snapImageDrawCallback->setFileName(file_path);
-        snapImageDrawCallback->setSnapImageOnNextFrame(true);
+        snapImageDrawCallback->write(file_path, true);
     }
     else
     {
         std::cout << "Warning: no make screenshot" << std::endl;
+    }
+}
+
+void CameraOverlay3D::getImage(osg::ref_ptr<osg::Image>& buffer){
+    osg::ref_ptr<SnapImageDrawCallback> snapImageDrawCallback = new
+            SnapImageDrawCallback();
+    camera->setPostDrawCallback( (snapImageDrawCallback.get()));
+    if(snapImageDrawCallback.get())
+    {
+        snapImageDrawCallback->getImage(buffer, true);
+    }
+    else
+    {
+        throw std::runtime_error("Could not register callback");
     }
 }
 

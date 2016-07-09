@@ -447,7 +447,7 @@ void CameraOverlay3D::updateDataIntern(base::samples::frame::Frame const& value)
         cv::flip(undistorted_image_cv_, rotated_image_cv_, 0);
     }
     else{
-        cv::flip(undistorted_image_cv_, rotated_image_cv_, 0);
+        cv::flip(input_image_cv_, rotated_image_cv_, 0);
     }
 
 

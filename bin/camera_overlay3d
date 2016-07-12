@@ -92,7 +92,7 @@ end
 ################################################################################################
 
 if hostname
-    Orocos::CORBA.max_message_size = 8400000
+    Orocos::CORBA.max_message_size = 8400000000
     Orocos::CORBA.name_service.ip = hostname
 end
 Orocos.initialize
@@ -125,6 +125,9 @@ overlay.setCameraIntrinsics(camera_calib, perform_undistortion)
 
 if urdf_file
    roboviz = Vizkit.default_loader.RobotVisualization
+   ctrl_gui = Vizkit.default_loader.ControlUi
+   ctrl_gui.configureUi(0, false, true, true, 0)
+   ctrl_gui.initFromURDF(urdf_file.dup)
    roboviz.modelFile = urdf_file
    roboviz.jointsSize = 0.02
    if(use_transformer)
@@ -135,13 +138,18 @@ if urdf_file
         robot_root = roboviz.getRootLink
         roboviz.frame = robot_root
    end
-
+require 'pry'
    if not state_task_name
       puts "URDF file, but no joint state task has been given. Robot visualization will not be updated with joint data"
    else
       joint_state_task = Orocos::Async.proxy state_task_name
       joint_state_task.port(state_port_name).on_data do |data|
-          roboviz.updateData(data)
+          puts ctrl_gui.getGenerateJointStateUi()
+
+          if ctrl_gui.getGenerateJointStateUi() == false
+              puts "updatting from robot"
+              roboviz.updateData(data)
+          end
           if not use_transformer
               segs = [camera_segment]+draw_segments
               segs.each do |seg|
@@ -151,6 +159,19 @@ if urdf_file
               end
           end
       end
+      joint_state_task.port(state_port_name).on_reachable do
+         print "Connected input to ", @state_task_name, ":", @state_port_name, "\n"
+         ctrl_gui.enableUpdateCB(true)
+      end
+      joint_state_task.port(state_port_name).on_data do |data|
+         ctrl_gui.setJointState(data)
+      end
+      
+      ctrl_gui.connect(SIGNAL('sendSignal()')) do
+          puts "updatting from ui"
+          roboviz.updateData(ctrl_gui.getJoints())
+          sleep 0.01
+       end
    end
 end
 
